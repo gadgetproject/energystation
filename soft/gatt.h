@@ -1,6 +1,6 @@
-/*! \file main.c
+/*! \file gatt.h
  *
- *  \brief Entry point
+ *  \brief Bluetooth LE GATT Service API
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -14,9 +14,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "gatt.h"
+#include <stdbool.h>
 
-void main(void)
-{
-    (void)gatt_init();
-}
+#define GATT_UUID_SERVICE \
+    BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c5)
+
+#define GATT_UUID_TOTAL_KWH_VAL \
+    BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c6)
+
+/**
+ * @brief Initialise the Bluetooth service
+ * @retval FALSE failed to start
+ */
+bool gatt_init(void);
