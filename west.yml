@@ -1,0 +1,23 @@
+manifest:
+  version: "0.13"
+
+  remotes:
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
+
+  defaults:
+    remote: zephyrproject
+
+  projects:
+    - name: zephyr
+      path: zephyr
+      west-commands: scripts/west-commands.yml
+      revision: main
+
+    - name: hal_espressif
+      path: modules/hal/espressif
+      west-commands: west/west-commands.yml
+      revision: zephyr
+
+  self:
+    path: gp
