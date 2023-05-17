@@ -19,5 +19,9 @@ manifest:
       west-commands: west/west-commands.yml
       revision: zephyr
 
+    - name: tinycrypt
+      path: modules/crypto/tinycrypt
+      revision: master
+
   self:
     path: gp
