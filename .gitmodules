@@ -1,0 +1,3 @@
+[submodule "hard/lib/kicad-libraries"]
+	path = hard/lib/kicad-libraries
+	url = git@github.com:espressif/kicad-libraries.git
