@@ -1,6 +1,6 @@
-/*! \file main.c
+/*! \file pulse.h
  *
- *  \brief Entry point
+ *  \brief Pulse detector API
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -14,19 +14,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pulse.h"
-#include "gatt.h"
+#include <stdbool.h>
 
-#include <zephyr/kernel.h>
+/**
+ * @brief Initialise the pulse detector
+ * @retval FALSE failed to start
+ */
+bool pulse_init(void);
 
-void pulse_test(unsigned milliseconds)
-{
-    printk("PULSE PERIOD=%ums\n", milliseconds);
-}
+/**
+ * @brief Pulse detection callback
+ * @param milliseconds since previous pulse or 0 if not known
+ */
+typedef void (*pulse_cb)(unsigned milliseconds);
 
-void main(void)
-{
-    (void)gatt_init();
-    (void)pulse_init();
-    (void)pulse_register(pulse_test);
-}
+/**
+ * @brief Register the pulse detection callback function
+ * @param callback to receive or NULL to stop
+ * @returns previous callback or NULL if none
+ */
+pulse_cb pulse_register(pulse_cb callback);
