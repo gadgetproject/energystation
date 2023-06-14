@@ -51,10 +51,11 @@ static void pulse_change(struct k_timer *debounce)
     if (pulse_detected)
     {
         uint64_t now_ms = (uint64_t)k_uptime_get();
-        if (pulse_callback)
+        pulse_cb callback = __atomic_load_n(&pulse_callback, __ATOMIC_SEQ_CST);
+        if (callback)
         {
             uint64_t duration = pulse_time_ms ? (now_ms-pulse_time_ms) : 0;
-            pulse_callback(duration > UINT32_MAX ? 0 : (uint32_t)duration);
+            callback(duration > UINT32_MAX ? 0 : (uint32_t)duration);
         }
         pulse_time_ms = now_ms;
     }
