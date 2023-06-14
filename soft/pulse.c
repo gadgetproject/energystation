@@ -24,9 +24,25 @@
 
 static bool pulse_detected = false;
 static struct k_timer pulse_debounce[2];    /**< ON/OFF debounce timers */
+static uint32_t pulse_milliseconds;         /**< Period between last two pulses */
 static uint64_t pulse_time_ms = 0;          /**< time of last pulse or 0 if unknown */
-static pulse_cb pulse_callback = NULL;
+static pulse_cb pulse_callback = NULL;      /**< External notification of pulse */
 static const struct gpio_dt_spec pulse_pin = GPIO_DT_SPEC_GET(DT_NODELABEL(pulse), gpios);
+
+/**
+ * @brief Callback from thread context
+ * @param ignored
+ */
+static void pulse_worker(struct k_work* ignored)
+{
+    ARG_UNUSED(ignored);
+
+    pulse_cb callback = __atomic_load_n(&pulse_callback, __ATOMIC_SEQ_CST);
+    if (callback)
+    {
+        callback(pulse_milliseconds);
+    }
+}
 
 /**
  * @brief Handle pulse interrupt debounce timer firing.
@@ -51,13 +67,13 @@ static void pulse_change(struct k_timer *debounce)
     if (pulse_detected)
     {
         uint64_t now_ms = (uint64_t)k_uptime_get();
-        pulse_cb callback = __atomic_load_n(&pulse_callback, __ATOMIC_SEQ_CST);
-        if (callback)
-        {
-            uint64_t duration = pulse_time_ms ? (now_ms-pulse_time_ms) : 0;
-            callback(duration > UINT32_MAX ? 0 : (uint32_t)duration);
-        }
+        uint64_t duration = pulse_time_ms ? (now_ms-pulse_time_ms) : 0;
+        pulse_milliseconds = duration > UINT32_MAX ? 0 : (uint32_t)duration;
         pulse_time_ms = now_ms;
+
+        /* We're in interrupt context; make callback from thread context */
+        static K_WORK_DEFINE(pulse_work, pulse_worker);
+        k_work_submit(&pulse_work);
     }
 }
 
@@ -117,7 +133,7 @@ bool pulse_init(void)
         return false;
     }
 
-    printk("pulse_init() ok");
+    printk("pulse_init() ok\n");
     return true;
 }
 

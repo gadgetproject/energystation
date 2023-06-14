@@ -21,7 +21,14 @@
 
 void pulse_test(unsigned milliseconds)
 {
-    printk("PULSE PERIOD=%ums\n", milliseconds);
+    if (k_is_in_isr())
+    {
+        printk("egads!\n");
+    }
+    else
+    {
+        printk("PULSE PERIOD=%ums\n", milliseconds);
+    }
 }
 
 void main(void)
