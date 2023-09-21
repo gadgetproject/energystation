@@ -30,6 +30,9 @@ static const struct bt_data gatt_adv[] = {
 static struct
 {
     const struct bt_gatt_attr *tkwh_attr;
+    const struct bt_gatt_attr *pwh_attr;
+    const struct bt_gatt_attr *cw_attr;
+    const struct bt_gatt_attr *eus_attr;
 } gatt_db;
 
 /**
@@ -37,7 +40,7 @@ static struct
  */
 static void gatt_update(void)
 {
-    static energy_status_t status;
+    energy_status_t status;
     energy_read(&status);
 
     printk("Energy=%u.%03ukWh\n", status.total_kilowatt_hours, status.part_milliwatt_hours/1000);
@@ -47,10 +50,39 @@ static void gatt_update(void)
     /* Notify remote */
     if (gatt_db.tkwh_attr)
     {
+        static uint32_t tkwh;
+        tkwh = status.total_kilowatt_hours;
         /* Littleendian */
         (void)bt_gatt_notify(NULL, gatt_db.tkwh_attr,
-                             &status.total_kilowatt_hours,
-                             sizeof(status.total_kilowatt_hours));
+                             &tkwh, sizeof(tkwh));
+    }
+    if (gatt_db.pwh_attr)
+    {
+        static uint16_t pwh;
+        pwh = status.part_milliwatt_hours/1000;
+        /* Littleendian */
+        (void)bt_gatt_notify(NULL, gatt_db.pwh_attr,
+                             &pwh, sizeof(pwh));
+    }
+    if (gatt_db.cw_attr)
+    {
+        static uint16_t watts;
+        watts = status.latest_milliwatts < (0xFFFFU*1000U)
+              ? (status.latest_milliwatts+500) / 1000U
+              : 0xFFFFU;
+        /* Littleendian */
+        (void)bt_gatt_notify(NULL, gatt_db.cw_attr,
+                             &watts, sizeof(watts));
+    }
+    if (gatt_db.eus_attr)
+    {
+        static uint16_t seconds;
+        seconds = status.update_milliseconds < (0xFFFF*1000U)
+                ? (status.update_milliseconds+999) / 1000U
+                : 0xFFFFU;
+        /* Littleendian */
+        (void)bt_gatt_notify(NULL, gatt_db.eus_attr,
+                             &seconds, sizeof(seconds));
     }
 }
 
@@ -88,12 +120,15 @@ static ssize_t gatt_read_tkwh(struct bt_conn *conn,
                               const struct bt_gatt_attr *attr,
                               void *buf, uint16_t len, uint16_t offset)
 {
-    static energy_status_t status;
+    energy_status_t status;
     energy_read(&status);
 
+    static uint32_t tkwh;
+    tkwh = status.total_kilowatt_hours;
+
+    /* Littleendian */
     return bt_gatt_attr_read(conn, attr, buf, len, offset,
-                             &status.total_kilowatt_hours,
-                             sizeof(status.total_kilowatt_hours));
+                             &tkwh, sizeof(tkwh));
 }
 
 static ssize_t gatt_write_tkwh(struct bt_conn *conn,
@@ -120,10 +155,106 @@ static ssize_t gatt_write_tkwh(struct bt_conn *conn,
     return len;
 }
 
+static ssize_t gatt_read_pwh(struct bt_conn *conn,
+                             const struct bt_gatt_attr *attr,
+                             void *buf, uint16_t len, uint16_t offset)
+{
+    energy_status_t status;
+    energy_read(&status);
+
+    static uint16_t pwh;
+    pwh = status.part_milliwatt_hours/1000;
+
+    /* Littleendian */
+    return bt_gatt_attr_read(conn, attr, buf, len, offset,
+                             &pwh, sizeof(pwh));
+}
+
+static ssize_t gatt_write_pwh(struct bt_conn *conn,
+                              const struct bt_gatt_attr *attr,
+                              const void *buf, uint16_t len, uint16_t offset,
+                              uint8_t flags)
+{
+    uint16_t pwh;
+
+    if (offset)
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    if (len != sizeof(pwh) || !buf)
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    /* Littleendian */
+    (void)memcpy(&pwh, buf, sizeof(pwh));
+
+    energy_status_t status;
+    energy_read(&status);
+    energy_reset(status.total_kilowatt_hours, 1000U*(uint32_t)pwh);
+
+    return len;
+}
+
+static ssize_t gatt_read_cw(struct bt_conn *conn,
+                            const struct bt_gatt_attr *attr,
+                            void *buf, uint16_t len, uint16_t offset)
+{
+    energy_status_t status;
+    energy_read(&status);
+
+    static uint16_t watts;
+    watts = status.latest_milliwatts < (0xFFFFU*1000U)
+          ? (status.latest_milliwatts+500) / 1000U
+          : 0xFFFFU;
+
+    /* Littleendian */
+    return bt_gatt_attr_read(conn, attr, buf, len, offset,
+                             &watts,
+                             sizeof(watts));
+}
+
+static ssize_t gatt_read_eus(struct bt_conn *conn,
+                            const struct bt_gatt_attr *attr,
+                            void *buf, uint16_t len, uint16_t offset)
+{
+    energy_status_t status;
+    energy_read(&status);
+
+    static uint16_t seconds;
+    seconds = status.update_milliseconds < (0xFFFF*1000U)
+            ? (status.update_milliseconds+999) / 1000U
+            : 0xFFFFU;
+
+    /* Littleendian */
+    return bt_gatt_attr_read(conn, attr, buf, len, offset,
+                             &seconds,
+                             sizeof(seconds));
+}
+
 static void gatt_tkwh_cfg_changed(const struct bt_gatt_attr *attr,  uint16_t value)
 {
-    /* Store for bt_gatt_notify() on write */
-    gatt_db.tkwh_attr = attr-1;
+    /* Store for gatt_update() */
+    gatt_db.tkwh_attr = (value & BT_GATT_CCC_NOTIFY) ? attr-1 : 0;
+}
+
+static void gatt_pwh_cfg_changed(const struct bt_gatt_attr *attr,  uint16_t value)
+{
+    /* Store for gatt_update() */
+    gatt_db.pwh_attr = (value & BT_GATT_CCC_NOTIFY) ? attr-1 : 0;
+}
+
+static void gatt_cw_cfg_changed(const struct bt_gatt_attr *attr,  uint16_t value)
+{
+    /* Store for gatt_update() */
+    gatt_db.cw_attr = (value & BT_GATT_CCC_NOTIFY) ? attr-1 : 0;
+}
+
+static void gatt_eus_cfg_changed(const struct bt_gatt_attr *attr,  uint16_t value)
+{
+    /* Store for gatt_update() */
+    gatt_db.eus_attr = (value & BT_GATT_CCC_NOTIFY) ? attr-1 : 0;
 }
 
 BT_GATT_SERVICE_DEFINE(gatt_svc,
@@ -135,5 +266,29 @@ BT_GATT_SERVICE_DEFINE(gatt_svc,
                            ( BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
                            gatt_read_tkwh, gatt_write_tkwh, NULL),
     BT_GATT_CCC(gatt_tkwh_cfg_changed,
+                (BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)),
+
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(GATT_UUID_PART_WH_VAL),
+                           ( BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE
+                             | BT_GATT_CHRC_NOTIFY),
+                           ( BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+                           gatt_read_pwh, gatt_write_pwh, NULL),
+    BT_GATT_CCC(gatt_pwh_cfg_changed,
+                (BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)),
+
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(GATT_UUID_CURRENT_W_VAL),
+                           ( BT_GATT_CHRC_READ
+                             | BT_GATT_CHRC_NOTIFY),
+                           ( BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+                           gatt_read_cw, NULL, NULL),
+    BT_GATT_CCC(gatt_cw_cfg_changed,
+                (BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)),
+
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(GATT_UUID_EXPECTED_UPDATE_S_VAL),
+                           ( BT_GATT_CHRC_READ
+                             | BT_GATT_CHRC_NOTIFY),
+                           ( BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+                           gatt_read_eus, NULL, NULL),
+    BT_GATT_CCC(gatt_eus_cfg_changed,
                 (BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)),
 );

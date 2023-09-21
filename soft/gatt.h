@@ -22,6 +22,15 @@
 #define GATT_UUID_TOTAL_KWH_VAL \
     BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c6)
 
+#define GATT_UUID_PART_WH_VAL \
+    BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c7)
+
+#define GATT_UUID_CURRENT_W_VAL \
+    BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c8)
+
+#define GATT_UUID_EXPECTED_UPDATE_S_VAL \
+    BT_UUID_128_ENCODE(0x931d9739, 0x7fda, 0x40e6, 0x96a5, 0x8c802e2785c9)
+
 /**
  * @brief Initialise the Bluetooth service
  * @retval FALSE failed to start
