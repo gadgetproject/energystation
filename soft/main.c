@@ -14,8 +14,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pulse.h"
+#include "energy.h"
 #include "gatt.h"
+#include "pulse.h"
 
 #include <zephyr/kernel.h>
 
@@ -28,11 +29,13 @@ void pulse_test(unsigned milliseconds)
     else
     {
         printk("PULSE PERIOD=%ums\n", milliseconds);
+        energy_1Wh(milliseconds);
     }
 }
 
 void main(void)
 {
+    (void)energy_init();
     (void)gatt_init();
     (void)pulse_init();
     (void)pulse_register(pulse_test);

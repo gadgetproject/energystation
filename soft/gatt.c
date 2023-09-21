@@ -15,14 +15,12 @@
  */
 
 #include "gatt.h"
-
-#include <stdint.h>
+#include "energy.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>
 
 #include <zephyr/sys/printk.h>
-
 
 static const struct bt_data gatt_adv[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -31,12 +29,30 @@ static const struct bt_data gatt_adv[] = {
 
 static struct
 {
-    uint32_t tkwh;
     const struct bt_gatt_attr *tkwh_attr;
-} gatt_db =
+} gatt_db;
+
+/**
+ * @brief A database change has occurred; notify remotes
+ */
+static void gatt_update(void)
 {
-    .tkwh = 12345,
-};
+    static energy_status_t status;
+    energy_read(&status);
+
+    printk("Energy=%u.%03ukWh\n", status.total_kilowatt_hours, status.part_milliwatt_hours/1000);
+    printk("Power=%umW\n", status.latest_milliwatts);
+    printk("Period=%ums\n", status.update_milliseconds);
+
+    /* Notify remote */
+    if (gatt_db.tkwh_attr)
+    {
+        /* Littleendian */
+        (void)bt_gatt_notify(NULL, gatt_db.tkwh_attr,
+                             &status.total_kilowatt_hours,
+                             sizeof(status.total_kilowatt_hours));
+    }
+}
 
 bool gatt_init(void)
 {
@@ -58,6 +74,12 @@ bool gatt_init(void)
         return false;
     }
 
+    if (energy_register(gatt_update))
+    {
+        printk("energy_register already\n");
+        return false;
+    }
+
     printk("gatt_init() ok\n");
     return true;
 }
@@ -66,7 +88,12 @@ static ssize_t gatt_read_tkwh(struct bt_conn *conn,
                               const struct bt_gatt_attr *attr,
                               void *buf, uint16_t len, uint16_t offset)
 {
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, &gatt_db.tkwh, sizeof(gatt_db.tkwh));
+    static energy_status_t status;
+    energy_read(&status);
+
+    return bt_gatt_attr_read(conn, attr, buf, len, offset,
+                             &status.total_kilowatt_hours,
+                             sizeof(status.total_kilowatt_hours));
 }
 
 static ssize_t gatt_write_tkwh(struct bt_conn *conn,
@@ -74,23 +101,21 @@ static ssize_t gatt_write_tkwh(struct bt_conn *conn,
                                const void *buf, uint16_t len, uint16_t offset,
                                uint8_t flags)
 {
+    uint32_t tkwh;
+
     if (offset)
     {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
-    if (len != sizeof(gatt_db.tkwh) || !buf)
+    if (len != sizeof(tkwh) || !buf)
     {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
-    (void)memcpy(&gatt_db.tkwh, buf, sizeof(gatt_db.tkwh));
-
-    /* Notify remote */
-    if (gatt_db.tkwh_attr)
-    {
-        (void)bt_gatt_notify(NULL, gatt_db.tkwh_attr, buf, len);
-    }
+    /* Littleendian */
+    (void)memcpy(&tkwh, buf, sizeof(tkwh));
+    energy_reset(tkwh, 0);
 
     return len;
 }
