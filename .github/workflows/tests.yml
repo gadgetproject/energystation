@@ -1,0 +1,26 @@
+# syntax for this file https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions
+# help on github actions: https://docs.github.com/en/actions/learn-github-actions/introduction-to-github-actions
+name: Tests
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    container:
+      image: throwtheswitch/madsciencelab
+    steps:
+      - uses: actions/checkout@v1
+      - name: Unit test
+        working-directory: ./soft/test
+        run: ceedling test:all
