@@ -34,11 +34,49 @@ typedef struct
     uint32_t update_milliseconds;   /**< Update interval or 0 if unknown */
 } energy_status_t;
 
+typedef uint16_t energy_watts_t;
+
 /**
  * @brief Snapshot the current status
  * @param [out] status receive buffer
  */
 void energy_read(energy_status_t* status);
+
+/**
+ * @brief Retrieve graph of energy usage
+ * @param offset zero-based offset into graph
+ * @param max_items to return in buffer
+ * @param buffer to receive graph
+ * @return number of items put in buffer
+ */
+unsigned energy_graph_3s(unsigned offset, unsigned max_items, energy_watts_t* buffer);
+
+/**
+ * @brief Retrieve graph of energy usage
+ * @param offset zero-based offset into graph
+ * @param max_items to return in buffer
+ * @param buffer to receive graph
+ * @return number of items put in buffer
+ */
+unsigned energy_graph_90s(unsigned offset, unsigned max_items, energy_watts_t* buffer);
+
+/**
+ * @brief Retrieve graph of energy usage
+ * @param offset zero-based offset into graph
+ * @param max_items to return in buffer
+ * @param buffer to receive graph
+ * @return number of items put in buffer
+ */
+unsigned energy_graph_45m(unsigned offset, unsigned max_items, energy_watts_t* buffer);
+
+/**
+ * @brief Retrieve graph of energy usage
+ * @param offset zero-based offset into graph
+ * @param max_items to return in buffer
+ * @param buffer to receive graph
+ * @return number of items put in buffer
+ */
+unsigned energy_graph_24h(unsigned offset, unsigned max_items, energy_watts_t* buffer);
 
 /**
  * @brief Energy monitor update callback
