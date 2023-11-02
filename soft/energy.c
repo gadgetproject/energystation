@@ -21,9 +21,10 @@
 
 #if 0
 # include <stdio.h>
-# define LOG_DBG(printf_like...) fprintf(stderr, printf_like)
+# define LOG_DBG(printf_like...) (void)fprintf(stderr, printf_like)
 #else
-# define LOG_DBG(printf_like...) (void)(printf_like)
+/* Compiler will parse all parameters but generate no code */
+# define LOG_DBG(printf_like...) while(0) ((void(*)())0)(printf_like)
 #endif
 
 static energy_status_t energy_status;

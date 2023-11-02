@@ -33,10 +33,11 @@ void pulse_test(unsigned milliseconds)
     }
 }
 
-void main(void)
+int main(void)
 {
     (void)energy_init();
     (void)gatt_init();
     (void)pulse_init();
     (void)pulse_register(pulse_test);
+    return 0;
 }
