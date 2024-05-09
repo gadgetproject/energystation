@@ -37,8 +37,9 @@ static struct
 
 /**
  * @brief A database change has occurred; notify remotes
+ * @param scope of update in milliseconds
  */
-static void gatt_update(void)
+static void gatt_update(unsigned scope)
 {
     energy_status_t status;
     energy_read(&status);

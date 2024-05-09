@@ -80,8 +80,14 @@ unsigned energy_graph_24h(unsigned offset, unsigned max_items, energy_watts_t* b
 
 /**
  * @brief Energy monitor update callback
+ * @param scope of energy history change in milliseconds.
+ *        0 = instantaneous only
+ *        3000 = instantaneous and 3s graph updated
+ *        90000 = instantaneous and 3s and 90s graphs updated
+ *        2700000 = instantaneous and 3s, 90s and 45m graphs updated
+ *        86400000 = instantaneous and 3s, 90s, 45m and 24h graphs updated
  */
-typedef void (*energy_cb)(void);
+typedef void (*energy_cb)(unsigned scope);
 
 /**
  * @brief Register the energy update callback function

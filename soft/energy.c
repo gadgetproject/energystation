@@ -161,7 +161,7 @@ void energy_reset(uint32_t tkwh, uint32_t pmwh)
     /* Update observer */
     if (energy_update)
     {
-        energy_update();
+        energy_update(0);
     }
 }
 
@@ -169,8 +169,9 @@ void energy_reset(uint32_t tkwh, uint32_t pmwh)
  * @brief Add average power to history
  * @param watts average power
  * @param milliseconds over which power was averaged, range 0..3000
+ * @returns largest record updated, in milliseconds
  */
-static void energy_record(energy_watts_t watts, unsigned milliseconds)
+static unsigned energy_record(energy_watts_t watts, unsigned milliseconds)
 {
     unsigned index = (energy_history.milliseconds / 3000U);
     LOG_DBG("energy_record(%u, %u) index=%u\n", watts, milliseconds, index);
@@ -186,6 +187,7 @@ static void energy_record(energy_watts_t watts, unsigned milliseconds)
     /* Find 3s record */
     unsigned index_3s = index % 30U;
     index /= 30U;
+    unsigned largest_bucket = 3000;
     energy_history.sec3[index_3s] = watts;
 
     /* Calculate new 90s record ?*/
@@ -200,6 +202,7 @@ static void energy_record(energy_watts_t watts, unsigned milliseconds)
         {
             sum_watts += energy_history.sec3[i];
         }
+        largest_bucket = 90000;
         energy_history.sec90[index_90s] = (sum_watts+15U)/30U;
 
         /* Calculate new 45m record? */
@@ -213,6 +216,7 @@ static void energy_record(energy_watts_t watts, unsigned milliseconds)
             {
                 sum_watts += energy_history.sec90[i];
             }
+            largest_bucket = 45*60000;
             energy_history.min45[index_45m] = (sum_watts+15U)/30U;
 
             /* Calculate new 24h record? */
@@ -223,6 +227,7 @@ static void energy_record(energy_watts_t watts, unsigned milliseconds)
                 {
                     sum_watts += energy_history.min45[i];
                 }
+                largest_bucket = 24*60*60000;
                 energy_history.hour24[index] = (sum_watts+16U)/32U;
             }
         }
@@ -232,7 +237,7 @@ static void energy_record(energy_watts_t watts, unsigned milliseconds)
     LOG_DBG("energy_history.sec3[]=");
     for (unsigned i = 0; i < 30; i++)
         LOG_DBG("%u%c", energy_history.sec3[i], i < 29 ? ' ' : '\n');
-
+    return largest_bucket;
 }
 
 void energy_1Wh(unsigned milliseconds)
@@ -260,6 +265,7 @@ void energy_1Wh(unsigned milliseconds)
 
     /* Rollover 3s boundary? */
     unsigned sub3s_ms = 3000-(energy_history.milliseconds % 3000);
+    unsigned largest_bucket = 0;
     if (milliseconds < sub3s_ms)
     {
         sub3s_ms = milliseconds;
@@ -267,13 +273,17 @@ void energy_1Wh(unsigned milliseconds)
     else
     {
         /* Accumulate energy to 3s boundary */
-        energy_record((energy_history.millijoules + sub3s_ms*watts + 500U)/3000U, sub3s_ms);
+        largest_bucket = energy_record((energy_history.millijoules + sub3s_ms*watts + 500U)/3000U, sub3s_ms);
         energy_history.millijoules = 0;
 
         /* Register continuous 3s chunks */
         for (sub3s_ms = milliseconds-sub3s_ms; sub3s_ms >= 3000U; sub3s_ms -= 3000U)
         {
-            energy_record(watts, 3000U);
+            unsigned bucket = energy_record(watts, 3000U);
+            if (bucket > largest_bucket)
+            {
+                largest_bucket = bucket;
+            }
         }
     }
 
@@ -285,6 +295,6 @@ void energy_1Wh(unsigned milliseconds)
     energy_status.update_milliseconds = milliseconds;
     if (energy_update)
     {
-        energy_update();
+        energy_update(largest_bucket);
     }
 }

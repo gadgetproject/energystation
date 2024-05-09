@@ -20,74 +20,99 @@
 
 #include <string.h>	/* memset() */
 
+static unsigned fixture_expect_update = ~0U;
+
+#define EXPECT_UPDATE(scope_)                     \
+do                                                \
+{                                                 \
+    TEST_ASSERT_EQUAL(~0U, fixture_expect_update); \
+    fixture_expect_update = scope_;               \
+} while(0)
+
+static void fixture_update(unsigned scope)
+{
+    /* Update expected? */
+    TEST_ASSERT_TRUE(~fixture_expect_update);
+    /* Update matches? */
+    TEST_ASSERT_EQUAL(fixture_expect_update, scope);
+    fixture_expect_update = ~0U;
+}
+
 void setUp(void)
 {
-	TEST_ASSERT_TRUE(energy_init());
+    TEST_ASSERT_TRUE(energy_init());
+    energy_register(&fixture_update);
 }
 
 void tearDown(void)
 {
+    EXPECT_UPDATE(~0U);
 }
 
 void test_init(void)
 {
-	energy_status_t s;
-	(void)memset(&s, 0x55, sizeof(s));
+    energy_status_t s;
+    (void)memset(&s, 0x55, sizeof(s));
 
-	energy_read(&s);
-	TEST_ASSERT_EQUAL(0, s.total_kilowatt_hours);
-	TEST_ASSERT_EQUAL(0, s.part_milliwatt_hours);
-	TEST_ASSERT_EQUAL(0, s.latest_milliwatts);
+    energy_read(&s);
+    TEST_ASSERT_EQUAL(0, s.total_kilowatt_hours);
+    TEST_ASSERT_EQUAL(0, s.part_milliwatt_hours);
+    TEST_ASSERT_EQUAL(0, s.latest_milliwatts);
 }
 
 void test_reset(void)
 {
-	energy_status_t s;
-	(void)memset(&s, 0x55, sizeof(s));
+    energy_status_t s;
+    (void)memset(&s, 0x55, sizeof(s));
 
-	energy_reset(12345678, 654321);
-	energy_read(&s);
-	TEST_ASSERT_EQUAL(12345678, s.total_kilowatt_hours);
-	TEST_ASSERT_EQUAL(654321, s.part_milliwatt_hours);
+    EXPECT_UPDATE(0);
+    energy_reset(12345678, 654321);
+    energy_read(&s);
+    TEST_ASSERT_EQUAL(12345678, s.total_kilowatt_hours);
+    TEST_ASSERT_EQUAL(654321, s.part_milliwatt_hours);
 }
 
 void test_1Wh(void)
 {
-	energy_reset(112358, 999999);
-	energy_1Wh(3600);	/* 1kW */
+    EXPECT_UPDATE(0);
+    energy_reset(112358, 999999);
+    EXPECT_UPDATE(3000);
+    energy_1Wh(3600);	/* 1kW */
 
-	energy_status_t s;
-	energy_read(&s);
-	TEST_ASSERT_EQUAL(112359, s.total_kilowatt_hours);
-	TEST_ASSERT_EQUAL(0, s.part_milliwatt_hours);
-	TEST_ASSERT_EQUAL(1000000, s.latest_milliwatts);
-	TEST_ASSERT_EQUAL(3600, s.update_milliseconds);
+    energy_status_t s;
+    energy_read(&s);
+    TEST_ASSERT_EQUAL(112359, s.total_kilowatt_hours);
+    TEST_ASSERT_EQUAL(0, s.part_milliwatt_hours);
+    TEST_ASSERT_EQUAL(1000000, s.latest_milliwatts);
+    TEST_ASSERT_EQUAL(3600, s.update_milliseconds);
 }
 
 void test_register_update(void)
 {
-	energy_reset(112358, 998012);
+    EXPECT_UPDATE(0);
+    energy_reset(112358, 998012);
 
-	static energy_status_t status;
-	static bool updated;
+    static energy_status_t status;
+    static bool updated;
 
-	void callback(void)
-	{
-		energy_read(&status);
-		TEST_ASSERT_EQUAL(112358, status.total_kilowatt_hours);
-		TEST_ASSERT_EQUAL(999000, status.part_milliwatt_hours);
-		TEST_ASSERT_EQUAL(50000, status.latest_milliwatts);
-		TEST_ASSERT_EQUAL(72000, status.update_milliseconds);
-		updated = true;
-	}
-	energy_register(&callback);
+    void callback(unsigned scope)
+    {
+        TEST_ASSERT_EQUAL(3000, scope);
+        energy_read(&status);
+        TEST_ASSERT_EQUAL(112358, status.total_kilowatt_hours);
+        TEST_ASSERT_EQUAL(999000, status.part_milliwatt_hours);
+        TEST_ASSERT_EQUAL(50000, status.latest_milliwatts);
+        TEST_ASSERT_EQUAL(72000, status.update_milliseconds);
+        updated = true;
+    }
+    energy_register(&callback);
 
-	(void)memset(&status, 0x55, sizeof(status));
-	updated = false;
+    (void)memset(&status, 0x55, sizeof(status));
+    updated = false;
 
-	energy_1Wh(72000);	/* 50W */
+    energy_1Wh(72000);	/* 50W */
 
-	TEST_ASSERT_TRUE(updated);
+    TEST_ASSERT_TRUE(updated);
 }
 
 void test_history_30s(void)
@@ -98,16 +123,19 @@ void test_history_30s(void)
     TEST_ASSERT_EQUAL(0, energy_graph_3s(0, 30, watts_30s));
 
     /* 10s @ 360W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(10000);
     energy_watts_t watts_10s[30];
     TEST_ASSERT_EQUAL(3, energy_graph_3s(0, 30, watts_10s));
 
     /* 16s @ 225W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(16000);
     energy_watts_t watts_26s[30];
     TEST_ASSERT_EQUAL(8, energy_graph_3s(0, 30, watts_26s));
 
     /* 4s @ 900W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(4000);
 
     /* Final history is 30s */
@@ -130,10 +158,13 @@ void test_history_30s(void)
 void test_history_9s(void)
 {
     /* 4s @ 900W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(4000);
     /* 1s @ 3600W */
+    EXPECT_UPDATE(0);
     energy_1Wh(1000);
     /* 4s @ 900W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(4000);
 
     energy_watts_t expected[4] =
@@ -167,8 +198,10 @@ void test_history_9s(void)
 void test_history_3m(void)
 {
     /* 60s @ 60W */
+    EXPECT_UPDATE(3000);
     energy_1Wh(60000);
     /* 120s @ 30W */
+    EXPECT_UPDATE(90000);
     energy_1Wh(120000);
 
     energy_watts_t watts[60];
@@ -186,8 +219,10 @@ void test_history_2h(void)
     for (unsigned i = 0; i < 40; i++)
     {
         /* 60s @ 60W */
+        EXPECT_UPDATE(3000);
         energy_1Wh(60000);
         /* 120s @ 30W */
+        EXPECT_UPDATE((i+1) % 15 ? 90000 : 2700000);
         energy_1Wh(120000);
     }
 
