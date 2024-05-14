@@ -9,6 +9,8 @@ import '../widgets/system_device_tile.dart';
 import '../widgets/scan_result_tile.dart';
 import '../utils/extra.dart';
 
+import '../uuids.dart';
+
 class ScanScreen extends StatefulWidget {
   const ScanScreen({Key? key}) : super(key: key);
 
@@ -28,7 +30,22 @@ class _ScanScreenState extends State<ScanScreen> {
     super.initState();
 
     _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
-      _scanResults = results;
+      // Filter scan results by Service UUID
+      List<ScanResult> filtered = [];
+      for (ScanResult device in results) {
+        ScanResult? ok;
+        for (Guid service in device.advertisementData.serviceUuids) {
+          if (service == GP_SERVICE_UUID) {
+            ok = device;
+          }
+        }
+        if (ok != null) {
+          filtered.add(ok);
+        } else {
+          print(device);
+        }
+      }
+      _scanResults = filtered;
       if (mounted) {
         setState(() {});
       }
@@ -140,7 +157,7 @@ class _ScanScreenState extends State<ScanScreen> {
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Find Devices'),
+          title: const Text('Nearby EnergyStations'),
         ),
         body: RefreshIndicator(
           onRefresh: onRefresh,
