@@ -27,6 +27,10 @@ static const struct bt_data gatt_adv[] = {
     BT_DATA_BYTES(BT_DATA_UUID128_ALL, GATT_UUID_SERVICE),
 };
 
+static const struct bt_data gatt_scan[] = {
+    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME)-1),
+};
+
 static struct
 {
     const struct bt_gatt_attr *tkwh_attr;
@@ -166,9 +170,9 @@ bool gatt_init(void)
         return false;
     }
 
-    err = bt_le_adv_start(BT_LE_ADV_CONN_NAME,
+    err = bt_le_adv_start(BT_LE_ADV_CONN,
                           gatt_adv, ARRAY_SIZE(gatt_adv),
-                          NULL, 0);
+                          gatt_scan, ARRAY_SIZE(gatt_scan));
     if (err)
     {
         printk("bt_le_adv_start()=%d\n", err);
